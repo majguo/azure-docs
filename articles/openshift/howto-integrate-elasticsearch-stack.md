@@ -1,24 +1,25 @@
 ---
-title: Integrate your Open Liberty application with Elasticsearch stack
-description: Integrate your Open Liberty application with Elasticsearch stack.
+title: Integrate your Liberty application with Elasticsearch stack
+description: Integrate your Liberty application with Elasticsearch stack.
 author: jiangma
 ms.author: jiangma
 ms.service: container-service
 ms.topic: conceptual
 ms.date: 06/22/2020
-keywords: java, jakartaee, javaee, open-liberty, aro, openshift, red hat, elasticsearch
+keywords: java, jakartaee, javaee, open-liberty, websphere-liberty, aro, openshift, red hat, elasticsearch
 ---
 
-# Integrate your Open Liberty application with Elasticsearch stack
+# Integrate your Liberty application with Elasticsearch stack
 
-In this guide, you will integrate your Open Liberty application with Elasticsearch stack to enable distributed logging. The Open Liberty application is running on an Azure Red Hat OpenShift (ARO) 4 cluster. You learn how to:
+In this guide, you will integrate your Liberty application with Elasticsearch stack to enable distributed logging. The Liberty application is running on an Azure Red Hat OpenShift (ARO) 4 cluster. You learn how to:
 > [!div class="checklist"]
+>
 > * Distribute your application logs to hosted Elasticsearch on Microsoft Azure
 > * Distribute your application logs to EFK stack installed on ARO 4 cluster
 
 ## Before you begin
 
-In previous guide, a Java application, which is running inside Open Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
+In previous guide, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
 
 ## Distribute your application logs to hosted Elasticsearch on Microsoft Azure
 
@@ -41,182 +42,71 @@ Follow the instructions below to create a deployment for the hosted Elasticsearc
 
 The application `<path-to-repo>/2-simple` used in the [previous guide](howto-deploy-java-openliberty-app.md) is ready to write logs to `messages.log` file, using Java Logging API `java.util.logging`. With logging in `JSON` format is configured, Filebeat can run as a side-container to collect and ship logs from `messages.log` file to the hosted Elasticsearch service on Microsoft Azure.
 
-Follow the steps below to configure Filebeat as a side container to retrieve and ship application logs.
+To configure Filebeat as a side container to retrieve and ship application logs, a number of Kubernetes resource YAML files need to be updated or created.
 
-#### Configure Filebeat
-
-You need to create a service account, which is required by Filebeat container. Here is the YAML file for you located at `<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/filebeat-svc-account.yaml`.
-
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: filebeat-svc-account
-  namespace: open-liberty-demo
-```
-
-1. Change directory to `<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch`.
-2. Change project to **open-liberty-demo**:
-
-   ```bash
-   oc project open-liberty-demo
-   ````
-
-   > [!NOTE]
-   > * Refer to [Set up Azure Red Hat OpenShift cluster](howto-deploy-java-openliberty-app.md#set-up-azure-red-hat-openshift-cluster) on how to connect to the cluster.
-   > * **open-liberty-demo** is already created in the [previous guide](howto-deploy-java-openliberty-app.md).
-
-3. Create service account:
-
-   ```bash
-   oc create -f ./filebeat-svc-account.yaml
-   ```
-
-4. Grant the Filebeat service account access to the privileged security context constraints (SCC):
-
-   ```bash
-   oc adm policy add-scc-to-user privileged -n open-liberty-demo -z filebeat-svc-account
-   ```
-
-Then create a **ConfigMap** for Filebeat configuration, using the YAML file located at `<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/filebeat-config.yaml`.
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: filebeat-config
-  namespace: open-liberty-demo
-data:
-  filebeat.yml: |-
-    filebeat.inputs:
-    - type: log
-      paths:
-        - /logs/messages*.log
-      json.message_key: ibm_datetime
-      json.keys_under_root: true
-      json.add_error_key: true
-    cloud.id: ${ELASTIC_CLOUD_ID}
-    cloud.auth: ${ELASTIC_CLOUD_AUTH}
-```
-
-1. Create **ConfigMap**:
-
-   ```bash
-   oc create -f ./filebeat-config.yaml
-   ```
-
-#### Create secret for hosted Elasticsearch service authentication
-
-Next, create a **Secret** with the authentication credentials of the hosted Elasticsearch service, using the YAML file located at `<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/elastic-cloud-secret.yaml`.
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: elastic-cloud-secret
-  namespace: open-liberty-demo
-type: Opaque
-stringData:
-  elastic.cloud.id: ${ELASTIC_CLOUD_ID}
-  elastic.cloud.auth: ${ELASTIC_CLOUD_AUTH}
-```
-
-> [!NOTE]
-> * Replace **${ELASTIC_CLOUD_ID}** with **Cloud ID** you wrote down before.
-> * Replace **${ELASTIC_CLOUD_AUTH}** with **User name:Password** you wrote down before.
-
-1. Create **Secret**:
-
-   ```bash
-   oc create -f ./elastic-cloud-secret.yaml
-   ```
-
-#### Deploy application with Filebeat as a side-container
-
-Now we can deploy the sample Open Liberty Application with Filebeat as a side-container to collect and ship application logs, using the YAML file located at `<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/openlibertyapplication.yaml`.
-
-```yaml
-apiVersion: openliberty.io/v1beta1
-kind: OpenLibertyApplication
-metadata:
-  name: javaee-cafe-elk-hosted-elasticsearch
-  namespace: open-liberty-demo
-spec:
-  replicas: 1
-  # Note: replace "${Your_DockerHub_Account}" with your Docker Hub account name
-  applicationImage: docker.io/${Your_DockerHub_Account}/javaee-cafe-simple:1.0.0
-  expose: true
-  serviceAccountName: filebeat-svc-account
-  env:
-  - name: WLP_LOGGING_MESSAGE_FORMAT
-    value: JSON
-  - name: WLP_LOGGING_MESSAGE_SOURCE
-    value: message,trace,accessLog,ffdc,audit
-  volumeMounts:
-  - name: logs-volume
-    mountPath: /logs
-  volumes:
-  - name: logs-volume
-    emptyDir: {}
-  - name: config
-    configMap:
-      defaultMode: 0600
-      name: filebeat-config
-  sidecarContainers:
-  - name: filebeat
-    image: docker.elastic.co/beats/filebeat:7.6.2
-    args: [
-      "-c", "/etc/filebeat.yml",
-      "-e",
-    ]
-    securityContext:
-      runAsUser: 0
-      privileged: true
-    env:
-    - name: ELASTIC_CLOUD_ID
-      valueFrom:
-        secretKeyRef:
-          name: elastic-cloud-secret
-          key: elastic.cloud.id
-    - name: ELASTIC_CLOUD_AUTH
-      valueFrom:
-        secretKeyRef:
-          name: elastic-cloud-secret
-          key: elastic.cloud.auth
-    volumeMounts:
-    - name: config
-      mountPath: /etc/filebeat.yml
-      readOnly: true
-      subPath: filebeat.yml
-    - name: logs-volume
-      mountPath: /logs
-      readOnly: true
-```
-
-> [!NOTE]
-> * Replace **${Your_DockerHub_Account}** with your Docker Hub account name.
-> * Image `javaee-cafe-simple` is built from [previous guide](howto-deploy-java-openliberty-app.md#build-application-image).
-
-1. Run the following commands to deploy your Open Liberty Application:
-
-   ```bash
-   # Create OpenLibertyApplication custom resource
-   oc create -f ./openlibertyapplication.yaml
-
-   # Check if OpenLibertyApplication instance is created
-   oc get openlibertyapplication
-
-   # Check if deployment created by Operator is ready
-   oc get deployment
-
-   # Check if route is created by Operator
-   oc get route
-   ```
-
-2. Once the Open Liberty Application is up and running, open **HOST/PORT** of the route in your browser to visit the application home page.
-3. To generate application logs, **Create a new coffee** and **Delete an existing coffee** in the application home page.
+| File Name             | Source Path                     | Destination Path              | Operation  | Description           |
+|-----------------------|---------------------------------|-------------------------------|------------|-----------------------|  
+| `filebeat-svc-account.yaml` | | [`<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/filebeat-svc-account.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/elk-logging/hosted-elasticsearch/filebeat-svc-account.yaml) | New | A Kubernetes **ServiceAccount** resource which is used for Filebeat container. |
+| `filebeat-config.yaml` | | [`<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/filebeat-config.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/elk-logging/hosted-elasticsearch/filebeat-config.yaml) | New | A Kubernetes **ConfigMap** resource which is used as the Filebeat configuration file. |
+| `elastic-cloud-secret.yaml` | | [`<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/elastic-cloud-secret.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/elk-logging/hosted-elasticsearch/elastic-cloud-secret.yaml) | New | A Kubernetes **Secret** resource with Hosted Elasticsearch service connection credentials, including `elastic.cloud.id`, and `elastic.cloud.auth`. |
+| `openlibertyapplication.yaml` | [`<path-to-repo>/2-simple/openlibertyapplication.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/2-simple/openlibertyapplication.yaml) | [`<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/openlibertyapplication.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/elk-logging/hosted-elasticsearch/openlibertyapplication.yaml) | Updated | Configure Filebeat as sidecar container. |
 
 For reference, you can find these deployment files from `<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch` of your local clone.
+
+Now we can deploy the sample Liberty application to the ARO 4 cluster, by executing the following commands.
+
+```bash
+# Change directory to "<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch"
+cd <path-to-repo>/3-integration/elk-logging/hosted-elasticsearch
+
+# Change project to "open-liberty-demo"
+oc project open-liberty-demo
+
+# Create ServiceAccount "filebeat-svc-account"
+oc create -f filebeat-svc-account.yaml
+
+# Grant the service account access to the privileged security context constraints
+oc adm policy add-scc-to-user privileged -n open-liberty-demo -z filebeat-svc-account
+
+# Create ConfigMap "filebeat-config"
+oc create -f filebeat-config.yaml
+
+# Create environment variables which will be passed to secret "elastic-cloud-secret"
+# Note: replace "<Cloud ID>", "<User name>", and "<Password>" with the ones you noted down before
+export ELASTIC_CLOUD_ID=<Cloud ID>
+export ELASTIC_CLOUD_AUTH=<User name>:<Password>
+
+# Create secret "elastic-cloud-secret"
+envsubst < elastic-cloud-secret.yaml | oc create -f -
+
+# Create environment variables which will be passed to OpenLibertyApplication "javaee-cafe-elk-hosted-elasticsearch"
+# Note: replace "<Container_Registry_URL>" with the fully qualified name of your ACR instance
+export Container_Registry_URL=<Container_Registry_URL>
+
+# Create OpenLibertyApplication "javaee-cafe-elk-hosted-elasticsearch"
+envsubst < openlibertyapplication.yaml | oc create -f -
+
+# Check if OpenLibertyApplication instance is created
+oc get openlibertyapplication javaee-cafe-elk-hosted-elasticsearch
+
+# Check if deployment created by Operator is ready
+oc get deployment javaee-cafe-elk-hosted-elasticsearch
+
+# Check if route is created by Operator
+oc get route javaee-cafe-elk-hosted-elasticsearch
+```
+
+> [!NOTE]
+>
+> * Refer to [Set up Azure Red Hat OpenShift cluster](howto-deploy-java-openliberty-app.md#set-up-azure-red-hat-openshift-cluster) on how to connect to the cluster.
+> * **open-liberty-demo** is already created in the [previous guide](howto-deploy-java-openliberty-app.md).
+> * Replace **\<Cloud ID>**, **\<User name>**, and **\<Password>** with the ones you noted down before.
+> * Replace **\<Container_Registry_URL>** with the fully qualified name of your ACR instance.
+
+Once the Liberty Application is up and running:
+
+1. Open **HOST/PORT** of the route in your browser to visit the application home page.
+2. To generate application logs, **Create a new coffee** and **Delete an existing coffee** in the application home page.
 
 ### Visualize your application logs in Kibana
 
@@ -246,9 +136,8 @@ Follow the instructions in these tutorials and then return here to continue.
 1. [Connect to the cluster](https://docs.microsoft.com/azure/openshift/tutorial-connect-cluster).
 2. Install the Elasticsearch Operator by following the steps in [Install the Elasticsearch Operator using the CLI](https://docs.openshift.com/container-platform/4.3/logging/cluster-logging-deploying.html#cluster-logging-deploy-eo-cli_cluster-logging-deploying).
 3. Install the Cluster Logging Operator by following the steps in [Install the Cluster Logging Operator using the CLI](https://docs.openshift.com/container-platform/4.3/logging/cluster-logging-deploying.html#cluster-logging-deploy-clo-cli_cluster-logging-deploying).
-
-> [!NOTE]
-> To specify the name of an existing **StorageClass** for Elasticsearch storage in step **Create a Cluster Logging instance**, open **ARO web console** > **Storage** > **Storage Classes** and find the supported storage class name.
+   > [!NOTE]
+   > To specify the name of an existing **StorageClass** for Elasticsearch storage in step **Create a Cluster Logging instance**, open **ARO web console** > **Storage** > **Storage Classes** and find the supported storage class name.
 
 After the newly created Cluster Logging instance is up and running, configure Fluentd to merge JSON log message body emitted by sample application.
 
@@ -274,49 +163,48 @@ After the newly created Cluster Logging instance is up and running, configure Fl
 
 The application `<path-to-repo>/2-simple` used in the [previous guide](howto-deploy-java-openliberty-app.md) is ready to write logs to `messages.log` file, using Java Logging API `java.util.logging`. With the **Open Liberty Operator**, which sets JSON as console log format and includes message as one of log sources, the application logs will be parsed by Fluentd and posted to Elasticsearch cluster.
 
-Now we can deploy the sample Open Liberty Application, using the YAML file located at `<path-to-repo>/3-integration/elk-logging/cluster-logging/openlibertyapplication.yaml`.
+To distribute your application logs to EFK stack, a number of Kubernetes resource YAML files need to be updated or created.
 
-```yaml
-apiVersion: openliberty.io/v1beta1
-kind: OpenLibertyApplication
-metadata:
-  name: javaee-cafe-elk-cluster-logging
-  namespace: open-liberty-demo
-spec:
-  replicas: 1
-  # Note: replace "${Your_DockerHub_Account}" with your Docker Hub account name
-  applicationImage: docker.io/${Your_DockerHub_Account}/javaee-cafe-simple:1.0.0
-  expose: true
+| File Name             | Source Path                     | Destination Path              | Operation  | Description           |
+|-----------------------|---------------------------------|-------------------------------|------------|-----------------------|  
+| `openlibertyapplication.yaml` | [`<path-to-repo>/2-simple/openlibertyapplication.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/2-simple/openlibertyapplication.yaml) | [`<path-to-repo>/3-integration/elk-logging/cluster-logging/openlibertyapplication.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/elk-logging/cluster-logging/openlibertyapplication.yaml) | Updated | Changed name to `javaee-cafe-elk-cluster-logging`. |
+
+For reference, you can find these deployment files from `<path-to-repo>/3-integration/elk-logging/cluster-logging` of your local clone.
+
+Now we can deploy the sample Liberty application to the ARO 4 cluster, by executing the following commands.
+
+```bash
+# Change directory to "<path-to-repo>/3-integration/elk-logging/cluster-logging"
+cd <path-to-repo>/3-integration/elk-logging/cluster-logging
+
+# Change project to "open-liberty-demo"
+oc project open-liberty-demo
+
+# Create environment variables which will be passed to OpenLibertyApplication "javaee-cafe-elk-cluster-logging"
+# Note: replace "<Container_Registry_URL>" with the fully qualified name of your ACR instance
+export Container_Registry_URL=<Container_Registry_URL>
+
+# Create OpenLibertyApplication "javaee-cafe-elk-cluster-logging"
+envsubst < openlibertyapplication.yaml | oc create -f -
+
+# Check if OpenLibertyApplication instance is created
+oc get openlibertyapplication javaee-cafe-elk-cluster-logging
+
+# Check if deployment created by Operator is ready
+oc get deployment javaee-cafe-elk-cluster-logging
+
+# Check if route is created by Operator
+oc get route javaee-cafe-elk-cluster-logging
 ```
 
 > [!NOTE]
-> * Replace **${Your_DockerHub_Account}** with your Docker Hub account name.
-> * Image `javaee-cafe-simple` is built from [previous guide](howto-deploy-java-openliberty-app.md#build-application-image).
+>
+> * Replace **\<Container_Registry_URL>** with the fully qualified name of your ACR instance.
 
-1. Change directory to `<path-to-repo>/3-integration/elk-logging/cluster-logging`.
-2. Run the following commands to deploy your Open Liberty Application:
+Once the Liberty Application is up and running:
 
-   ```bash
-   # Change project to "open-liberty-demo"
-   oc project open-liberty-demo
-
-   # Create OpenLibertyApplication custom resource
-   oc create -f ./openlibertyapplication.yaml
-
-   # Check if OpenLibertyApplication instance is created
-   oc get openlibertyapplication
-
-   # Check if deployment created by Operator is ready
-   oc get deployment
-
-   # Check if route is created by Operator
-   oc get route
-   ```
-
-3. Once the Open Liberty Application is up and running, open **HOST/PORT** of the route in your browser to visit the application home page.
-4. To generate application logs, **Create a new coffee** and **Delete an existing coffee** in the application home page.
-
-For reference, you can find these deployment files from `<path-to-repo>/3-integration/elk-logging/cluster-logging` of your local clone.
+1. Open **HOST/PORT** of the route in your browser to visit the application home page.
+2. To generate application logs, **Create a new coffee** and **Delete an existing coffee** in the application home page.
 
 ### Visualize your application logs in Kibana (EFK)
 
@@ -324,29 +212,31 @@ As long as the application logs are shipped to the Elasticsearch cluster, they c
 
 1. Log into ARO web console. Click **Monitoring** > **Logging**.
 2. In the new opened window, click **Log in with OpenShift**. Log in with user **kubeadmin**.
-3. Open **Management** > **Index Patterns** > Select **project.\*** > Click **Refresh field list** icon at top-right of the page.
+3. In **Authorize Access** page, click **Allow selected permissions**. Wait until Kibana web console is displayed.
+4. Open **Management** > **Index Patterns** > Select **project.\*** > Click **Refresh field list** icon at top-right of the page.
    ![refresh-field-list.png](./media/howto-integrate-elasticsearch-stack/refresh-field-list.png)
-4. Click **Discover**. Select index pattern **project.\*** from the dropdown list.
-5. Add **kubernetes.namespace_name**, **kubernetes.pod_name**, **loglevel**, and **message** from **Available Fields** into **Selected Fields**. Discover application logs from the work area of the page.
+5. Click **Discover**. Select index pattern **project.\*** from the dropdown list.
+6. Add **kubernetes.namespace_name**, **kubernetes.pod_name**, **loglevel**, and **message** from **Available Fields** into **Selected Fields**. Discover application logs from the work area of the page.
    ![discover-application-logs-cluster-logging](./media/howto-integrate-elasticsearch-stack/discover-application-logs-cluster-logging.png)
 
 ## Next steps
 
 In this guide, you learned how to:
 > [!div class="checklist"]
+>
 > * Distribute your application logs to hosted Elasticsearch on Microsoft Azure
 > * Distribute your application logs to EFK stack installed on ARO 4 cluster
 
-Advance to these guides, which integrate Open Liberty application with other Azure services:
+Advance to these guides, which integrate Liberty application with other Azure services:
 > [!div class="nextstepaction"]
-> [Integrate your Open Liberty application with Azure Active Directory OpenID Connect](howto-integrate-aad-oidc.md)
+> [Integrate your Liberty application with Azure managed databases](howto-integrate-azure-managed-databases.md)
 
 > [!div class="nextstepaction"]
-> [Integrate your Open Liberty application with Azure managed databases](howto-integrate-azure-managed-databases.md)
+> [Integrate your Liberty application with Azure Active Directory OpenID Connect](howto-integrate-aad-oidc.md)
 
 If you've finished all of above guides, advance to the complete guide, which incorporates all of Azure service integrations:
 > [!div class="nextstepaction"]
-> [Integrate your Open Liberty application with different Azure services](howto-integrate-all.md)
+> [Integrate your Liberty application with different Azure services](howto-integrate-all.md)
 
 Here are references used in this guide:
 
