@@ -1,18 +1,19 @@
 ---
-title: Integrate your Open Liberty application with Azure Active Directory OpenID Connect
-description: Integrate your Open Liberty application with Azure Active Directory OpenID Connect.
+title: Integrate your Liberty application with Azure Active Directory OpenID Connect
+description: Integrate your Liberty application with Azure Active Directory OpenID Connect.
 author: jiangma
 ms.author: jiangma
 ms.service: container-service
 ms.topic: conceptual
 ms.date: 07/07/2020
-keywords: java, jakartaee, javaee, open-liberty, aro, openshift, red hat, aad, oidc-client
+keywords: java, jakartaee, javaee, open-liberty, websphere-liberty, aro, openshift, red hat, aad, oidc-client
 ---
 
-# Integrate your Open Liberty application with Azure Active Directory OpenID Connect
+# Integrate your Liberty application with Azure Active Directory OpenID Connect
 
-In this guide, you will integrate your Open Liberty application with Azure Active Directory OpenID Connect for security. The Open Liberty application is running on an Azure Red Hat OpenShift (ARO) 4 cluster. You learn how to:
+In this guide, you will integrate your Liberty application with Azure Active Directory OpenID Connect for security. The Liberty application is running on an Azure Red Hat OpenShift (ARO) 4 cluster. You learn how to:
 > [!div class="checklist"]
+>
 > * Set up Azure Active Directory
 > * Prepare your application
 > * Prepare application image
@@ -20,7 +21,7 @@ In this guide, you will integrate your Open Liberty application with Azure Activ
 
 ## Before you begin
 
-In previous guide, a Java application, which is running inside Open Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
+In previous guide, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
 
 ## Set up Azure Active Directory
 
@@ -61,7 +62,7 @@ mvn -Dclient.id=<client ID> -Dclient.secret=<client secret> -Dtenant.id=<tenant 
 ```
 
 > [!NOTE]
-> **client ID**, **client secret**, **tenant ID**, and **group ID** are properties you wrote down in previous step "[Set up Azure Active Directory](#set-up-azure-active-directory)".
+> **\<client ID>**, **\<client secret>**, **\<tenant ID>**, and **\<group ID>** are properties you wrote down in previous step "[Set up Azure Active Directory](#set-up-azure-active-directory)".
 
 Once the application is up and running, open [https://localhost:9443](https://localhost:9443) in the **InPrivate** window of **Microsoft Edge**, verify the application is secured by Azure AD OpenID Connect.
 
@@ -76,44 +77,58 @@ Once the application is up and running, open [https://localhost:9443](https://lo
 6. Update your password if necessary. Accept permission requested if necessary.
 7. You will see the email address of your AAD account displayed in the application home page, where the coffee **Delete** button is **enabled** now.
    ![delete-button-enabled](./media/howto-integrate-aad-oidc/delete-button-enabled.png)
-
-Press **Control-C** to stop the application and Open Liberty server.
+8. Press **Control-C** to stop the application and Open Liberty server.
 
 ## Prepare application image
 
-The `Dockerfile` located at [`<path-to-repo>/3-integration/aad-oidc/Dockerfile`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/aad-oidc/Dockerfile) is same as the one used in the [previous guide](howto-deploy-java-openliberty-app.md). Execute the following commands to build the application image:
+To build the application image, Dockerfile needs to be prepared in advance:
+
+| File Name             | Source Path                     | Destination Path              | Operation  | Description           |
+|-----------------------|---------------------------------|-------------------------------|------------|-----------------------|  
+| `Dockerfile` | [`<path-to-repo>/2-simple/Dockerfile`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/2-simple/Dockerfile) | [`<path-to-repo>/3-integration/aad-oidc/Dockerfile`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/aad-oidc/Dockerfile) | Duplicated | Copied from `2-simple/Dockerfile`, which is based on Open Liberty base image. |
+| `Dockerfile-wlp` | [`<path-to-repo>/2-simple/Dockerfile-wlp`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/2-simple/Dockerfile-wlp) | [`<path-to-repo>/3-integration/aad-oidc/Dockerfile-wlp`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/aad-oidc/Dockerfile-wlp) | Duplicated | Copied from `2-simple/Dockerfile-wlp`, which is based on WebSphere Liberty base image. |
+
+Follow steps below to build the application image:
 
 ```bash
 # Change directory to "<path-to-repo>/3-integration/aad-oidc"
 cd <path-to-repo>/3-integration/aad-oidc
 
 # Build and tag application image
-docker build -t javaee-cafe-aad-oidc:1.0.0 --pull .
+# Note:
+# - replace "${Docker_File}" with "Dockerfile" to build application image with Open Liberty base image
+# - replace "${Docker_File}" with "Dockerfile-wlp" to build application image with WebSphere Liberty base image
+docker build -t javaee-cafe-aad-oidc:1.0.0 --pull --file=${Docker_File} .
 
-# Create a new tag with your Docker Hub account info that refers to source image
-# Note: replace "${Your_DockerHub_Account}" with your valid Docker Hub account name
-docker tag javaee-cafe-aad-oidc:1.0.0 docker.io/${Your_DockerHub_Account}/javaee-cafe-aad-oidc:1.0.0
+# Create a new tag with your ACR instance info that refers to source image
+# Note: replace "${Container_Registry_URL}" with the fully qualified name of your ACR instance
+docker tag javaee-cafe-aad-oidc:1.0.0 ${Container_Registry_URL}/javaee-cafe-aad-oidc:1.0.0
 
-# Log in to Docker Hub
-docker login
+# Log in to your ACR instance
+# Note: replace "${Registry_Name}" with the name of your ACR instance
+az acr login -n ${Registry_Name}
 
-# Push image to your Docker Hub repositories
-# Note: replace "${Your_DockerHub_Account}" with your valid Docker Hub account name
-docker push docker.io/${Your_DockerHub_Account}/javaee-cafe-aad-oidc:1.0.0
+# Push image to your ACR instance
+# Note: replace "${Container_Registry_URL}" with the fully qualified name of your ACR instance
+docker push ${Container_Registry_URL}/javaee-cafe-aad-oidc:1.0.0
 ```
 
 > [!NOTE]
-> Replace **${Your_DockerHub_Account}** with your Docker Hub account name.
+>
+> * Replace **${Docker_File}** with **Dockerfile** to build application image with **Open Liberty** base image.
+> * Replace **${Docker_File}** with **Dockerfile-wlp** to build application image with **WebSphere Liberty** base image.
+> * Replace **${Container_Registry_URL}** with the fully qualified name of your ACR instance.
+> * Replace **${Registry_Name}** with the name of your ACR instance.
 
 After the application image is built, run with your local Docker to verify whether it works.
 
 1. Run `docker run -it --rm -p 9443:9443 -e CLIENT_ID=<client ID> -e CLIENT_SECRET=<client secret> -e TENANT_ID=<tenant ID> -e ADMIN_GROUP_ID=<group ID> javaee-cafe-aad-oidc:1.0.0` in your console.
    > [!NOTE]
-   > **client ID**, **client secret**, **tenant ID**, and **group ID** are properties you wrote down in previous step "[Set up Azure Active Directory](#set-up-azure-active-directory)".
+   > **\<client ID>**, **\<client secret>**, **\<tenant ID>**, and **\<group ID>** are properties you wrote down in previous step "[Set up Azure Active Directory](#set-up-azure-active-directory)".
 
-2. Wait for Open Liberty to start and the application to deploy successfully.
+2. Wait for Liberty to start and the application to deploy successfully.
 3. Open [https://localhost:9443/](https://localhost:9443/) in your browser to visit the application home page.
-4. Press **Control-C** to stop the application and Open Liberty server.
+4. Press **Control-C** to stop the application and Liberty server.
 
 ## Deploy sample application
 
@@ -127,7 +142,7 @@ To integrate the application with Azure AD OpenID Connect on the ARO 4 cluster, 
 
 For reference, these changes have already been applied in `<path-to-repo>/3-integration/aad-oidc` of your local clone.
 
-Now we can deploy the sample Open Liberty application to the ARO 4 cluster, by executing the following commands.
+Now we can deploy the sample Liberty application to the ARO 4 cluster, by executing the following commands.
 
 ```bash
 # Change directory to "<path-to-repo>/3-integration/aad-oidc"
@@ -159,29 +174,30 @@ export TLS_KEY=$(cat tls.key | base64 -w 0)
 envsubst < tls-crt-secret.yaml | oc create -f -
 
 # Create environment variables which will be passed to OpenLibertyApplication "javaee-cafe-aad-oidc"
-# Note: replace "<Your_DockerHub_Account>" with your valid Docker Hub account name
-export Your_DockerHub_Account=<Your_DockerHub_Account>
+# Note: replace "<Container_Registry_URL>" with the fully qualified name of your ACR instance
+export Container_Registry_URL=<Container_Registry_URL>
 
 # Create OpenLibertyApplication "javaee-cafe-aad-oidc"
 envsubst < openlibertyapplication.yaml | oc create -f -
 
 # Check if OpenLibertyApplication instance is created
-oc get openlibertyapplication
+oc get openlibertyapplication javaee-cafe-aad-oidc
 
 # Check if deployment created by Operator is ready
-oc get deployment
+oc get deployment javaee-cafe-aad-oidc
 
 # Check if route is created by Operator
-oc get route
+oc get route javaee-cafe-aad-oidc
 ```
 
 > [!NOTE]
+>
 > * Refer to [Set up Azure Red Hat OpenShift cluster](howto-deploy-java-openliberty-app.md#set-up-azure-red-hat-openshift-cluster) on how to connect to the cluster.
 > * **open-liberty-demo** is already created in the [previous guide](howto-deploy-java-openliberty-app.md).
 > * Replace **\<client ID>**, **\<client secret>**, **\<tenant ID>**, and **\<group ID>** with the ones you noted down before.
-> * Replace **\<Your_DockerHub_Account>** with your valid Docker Hub account name.
+> * Replace **\<Container_Registry_URL>** with the fully qualified name of your ACR instance.
 
-Once the Open Liberty Application is up and running, copy **HOST/PORT** of the route from console output.
+Once the Liberty Application is up and running, copy **HOST/PORT** of the route from console output.
 
 1. Open your **Azure AD** > **App registrations** > your **registered application** > **Authentication** > Click **Add URI** in **Redirect URIs** section > Input ***https://<copied_HOST/PORT_value>/ibm/api/social-login/redirect/liberty-aad-oidc-javaeecafe*** > Click **Save**.
 2. Open ***https://<copied_HOST/PORT_value>*** in your browser to visit the application home page.
@@ -190,21 +206,22 @@ Once the Open Liberty Application is up and running, copy **HOST/PORT** of the r
 
 In this guide, you learned how to:
 > [!div class="checklist"]
+>
 > * Set up Azure Active Directory
 > * Prepare your application
 > * Prepare application image
 > * Deploy sample application
 
-Advance to these guides, which integrate Open Liberty application with other Azure services:
+Advance to these guides, which integrate Liberty application with other Azure services:
 > [!div class="nextstepaction"]
-> [Integrate your Open Liberty application with Azure managed databases](howto-integrate-azure-managed-databases.md)
+> [Integrate your Liberty application with Elasticsearch stack](howto-integrate-elasticsearch-stack.md)
 
 > [!div class="nextstepaction"]
-> [Integrate your Open Liberty application with Elasticsearch stack](howto-integrate-elasticsearch-stack.md)
+> [Integrate your Liberty application with Azure managed databases](howto-integrate-azure-managed-databases.md)
 
 If you've finished all of above guides, advance to the complete guide, which incorporates all of Azure service integrations:
 > [!div class="nextstepaction"]
-> [Integrate your Open Liberty application with different Azure services](howto-integrate-all.md)
+> [Integrate your Liberty application with different Azure services](howto-integrate-all.md)
 
 Here are references used in this guide:
 
