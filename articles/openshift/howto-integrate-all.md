@@ -1,18 +1,19 @@
 ---
-title: Integrate your Open Liberty application with different Azure services
-description: Integrate your Open Liberty application with different Azure services.
+title: Integrate your Liberty application with different Azure services
+description: Integrate your Liberty application with different Azure services.
 author: jiangma
 ms.author: jiangma
 ms.service: container-service
 ms.topic: conceptual
 ms.date: 07/08/2020
-keywords: java, jakartaee, javaee, open-liberty, aro, openshift, red hat, aad, oidc-client, postgresql, elasticsearch
+keywords: java, jakartaee, javaee, open-liberty, websphere-liberty, aro, openshift, red hat, aad, oidc-client, postgresql, elasticsearch
 ---
 
-# Integrate your Open Liberty application with different Azure services
+# Integrate your Liberty application with different Azure services
 
-In this guide, you will integrate your Open Liberty application with different Azure services, including security, data persistence & distributed logging. The Open Liberty application is running on an Azure Red Hat OpenShift (ARO) 4 cluster. You learn how to:
+In this guide, you will integrate your Liberty application with different Azure services, including security, data persistence & distributed logging. The Liberty application is running on an Azure Red Hat OpenShift (ARO) 4 cluster. You learn how to:
 > [!div class="checklist"]
+>
 > * Set up different services
 > * Prepare your application
 > * Prepare application image
@@ -20,12 +21,12 @@ In this guide, you will integrate your Open Liberty application with different A
 
 ## Before you begin
 
-In previous guides, a Java application, which is running inside Open Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these guides, walk them through with the following links and return here to continue.
+In previous guides, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these guides, walk them through with the following links and return here to continue.
 
-* [Deploy a Java application inside Open Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md)
-* [Integrate your Open Liberty application with Azure Active Directory OpenID Connect](howto-integrate-aad-oidc.md)
-* [Integrate your Open Liberty application with Azure managed databases](howto-integrate-azure-managed-databases.md)
-* [Integrate your Open Liberty application with Elasticsearch stack](howto-integrate-elasticsearch-stack.md)
+* [Deploy a Java application inside Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md)
+* [Integrate your Liberty application with Elasticsearch stack](howto-integrate-elasticsearch-stack.md)
+* [Integrate your Liberty application with Azure managed databases](howto-integrate-azure-managed-databases.md)
+* [Integrate your Liberty application with Azure Active Directory OpenID Connect](howto-integrate-aad-oidc.md)
 
 ## Set up different services
 
@@ -65,30 +66,45 @@ mvn clean package
 
 ## Prepare application image
 
-The `Dockerfile` located at [`<path-to-repo>/4-finish/Dockerfile`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/4-finish/Dockerfile) is almost same as the one used in the previous [basic guide](howto-deploy-java-openliberty-app.md), except the addition of JDBC driver. Follow steps below to build the application image:
+To build the application image, Dockerfile needs to be prepared in advance:
+
+| File Name             | Source Path                     | Destination Path              | Operation  | Description           |
+|-----------------------|---------------------------------|-------------------------------|------------|-----------------------|  
+| `Dockerfile` | [`<path-to-repo>/2-simple/Dockerfile`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/2-simple/Dockerfile) | [`<path-to-repo>/4-finish/Dockerfile`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/4-finish/Dockerfile) | Updated | Add JDBC driver into application image, which is based on Open Liberty base image. |
+| `Dockerfile-wlp` | [`<path-to-repo>/2-simple/Dockerfile-wlp`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/2-simple/Dockerfile-wlp) | [`<path-to-repo>/4-finish/Dockerfile-wlp`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/4-finish/Dockerfile-wlp) | Updated | Add JDBC driver into application image, which is based on WebSphere Liberty base image. |
+
+Follow steps below to build the application image:
 
 1. Change directory to `<path-to-repo>/4-finish` of your local clone.
 2. Download [postgresql-42.2.4.jar](https://repo1.maven.org/maven2/org/postgresql/postgresql/42.2.4/postgresql-42.2.4.jar) and put it to current working directory.
-3. Run the following commands to build application image and push to your Docker Hub repository.
+3. Run the following commands to build application image and push to your ACR instance.
 
    ```bash
    # Build and tag application image
-   docker build -t javaee-cafe-all-in-one:1.0.0 --pull .
+   # Note:
+   # - replace "${Docker_File}" with "Dockerfile" to build application image with Open Liberty base image
+   # - replace "${Docker_File}" with "Dockerfile-wlp" to build application image with WebSphere Liberty base image
+   docker build -t javaee-cafe-all-in-one:1.0.0 --pull --file=${Docker_File} .
 
-   # Create a new tag with your Docker Hub account info that refers to source image
-   # Note: replace "${Your_DockerHub_Account}" with your valid Docker Hub account name
-   docker tag javaee-cafe-all-in-one:1.0.0 docker.io/${Your_DockerHub_Account}/javaee-cafe-all-in-one:1.0.0
+   # Create a new tag with your ACR instance info that refers to source image
+   # Note: replace "${Container_Registry_URL}" with the fully qualified name of your ACR instance
+   docker tag javaee-cafe-all-in-one:1.0.0 ${Container_Registry_URL}/javaee-cafe-all-in-one:1.0.0
 
-   # Log in to Docker Hub
-   docker login
+   # Log in to your ACR instance
+   # Note: replace "${Registry_Name}" with the name of your ACR instance
+   az acr login -n ${Registry_Name}
 
-   # Push image to your Docker Hub repositories
-   # Note: replace "${Your_DockerHub_Account}" with your valid Docker Hub account name
-   docker push docker.io/${Your_DockerHub_Account}/javaee-cafe-all-in-one:1.0.0
+   # Push image to your ACR instance
+   # Note: replace "${Container_Registry_URL}" with the fully qualified name of your ACR instance
+   docker push ${Container_Registry_URL}/javaee-cafe-all-in-one:1.0.0
    ```
 
    > [!NOTE]
-   > Replace **${Your_DockerHub_Account}** with your Docker Hub account name.
+   >
+   > * Replace **${Docker_File}** with **Dockerfile** to build application image with **Open Liberty** base image.
+   > * Replace **${Docker_File}** with **Dockerfile-wlp** to build application image with **WebSphere Liberty** base image.
+   > * Replace **${Container_Registry_URL}** with the fully qualified name of your ACR instance.
+   > * Replace **${Registry_Name}** with the name of your ACR instance.
 
 ## Deploy sample application
 
@@ -103,7 +119,7 @@ To integrate the application with Azure AD OpenID Connect and Azure Database for
 
 For reference, these changes have already been applied in `<path-to-repo>/4-finish` of your local clone.
 
-These resources have already been created in previous guides. Let's recap how we deploy the sample application to the ARO 4 cluster, by executing the following commands.
+Execute the following commands to deploy the sample application to the ARO 4 cluster.
 
 ```bash
 # Change directory to "<path-to-repo>/4-finish"
@@ -146,30 +162,31 @@ export DB_PASSWORD=<Password>
 envsubst < db-secret.yaml | oc create -f -
 
 # Create environment variables which will be passed to OpenLibertyApplication "javaee-cafe-all-in-one"
-# Note: replace "<Your_DockerHub_Account>" with your valid Docker Hub account name
-export Your_DockerHub_Account=<Your_DockerHub_Account>
+# Note: replace "<Container_Registry_URL>" with the fully qualified name of your ACR instance
+export Container_Registry_URL=<Container_Registry_URL>
 
 # Create OpenLibertyApplication "javaee-cafe-all-in-one"
 envsubst < openlibertyapplication.yaml | oc create -f -
 
 # Check if OpenLibertyApplication instance is created
-oc get openlibertyapplication
+oc get openlibertyapplication javaee-cafe-all-in-one
 
 # Check if deployment created by Operator is ready
-oc get deployment
+oc get deployment javaee-cafe-all-in-one
 
 # Check if route is created by Operator
-oc get route
+oc get route javaee-cafe-all-in-one
 ```
 
 > [!NOTE]
+>
 > * Refer to [Set up Azure Red Hat OpenShift cluster](howto-deploy-java-openliberty-app.md#set-up-azure-red-hat-openshift-cluster) on how to connect to the cluster.
 > * **open-liberty-demo** is already created in the [previous guide](howto-deploy-java-openliberty-app.md).
 > * Replace **\<client ID>**, **\<client secret>**, **\<tenant ID>**, and **\<group ID>** with the ones you noted down before.
 > * Replace **\<Server name>**, **\<Port number>**, **\<Admin username>**, and **\<Password>** with the ones you noted down before.
-> * Replace **\<Your_DockerHub_Account>** with your valid Docker Hub account name.
+> * Replace **\<Container_Registry_URL>** with the fully qualified name of your ACR instance.
 
-Once the Open Liberty Application is up and running, copy **HOST/PORT** of the route from console output.
+Once the Liberty Application is up and running, copy **HOST/PORT** of the route from console output.
 
 1. Open your **Azure AD** > **App registrations** > your **registered application** > **Authentication** > Click **Add URI** in **Redirect URIs** section > Input ***https://<copied_HOST/PORT_value>/ibm/api/social-login/redirect/liberty-aad-oidc-javaeecafe*** > Click **Save**.
 2. Open ***https://<copied_HOST/PORT_value>*** in the **InPrivate** window of **Microsoft Edge**, verify the application is secured by Azure AD OpenID Connect and connected to Azure Database for PostgreSQL server.
@@ -195,6 +212,7 @@ The application logs are shipped to the Elasticsearch cluster, and can be visual
 
 In this guide, you learned how to:
 > [!div class="checklist"]
+>
 > * Set up different services
 > * Prepare your application
 > * Prepare application image
