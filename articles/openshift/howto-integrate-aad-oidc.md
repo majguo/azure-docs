@@ -21,11 +21,11 @@ In this guide, you will integrate your Liberty application with Azure Active Dir
 
 ## Before you begin
 
-In previous guide, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
+In previous guide, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-liberty-app.md) and return here to continue.
 
 ## Set up Azure Active Directory
 
-You've already set up an Azure Active Directory in the [previous guide](howto-deploy-java-openliberty-app.md#set-up-azure-active-directory), the **tenant ID**, Azure AD users, **client ID** and **client secret** you wrote down before will also be used in this guide. Furthermore, complete the following steps to set up additional configurations for your Azure Active Directory.
+You've already set up an Azure Active Directory in the [previous guide](howto-deploy-java-liberty-app.md#set-up-azure-active-directory), the **tenant ID**, Azure AD users, **client ID** and **client secret** you wrote down before will also be used in this guide. Furthermore, complete the following steps to set up additional configurations for your Azure Active Directory.
 
 1. Open your **Azure AD** > **App registrations** > your **registered application** > **Authentication** > Click **Add URI** in **Redirect URIs** section > Input `https://localhost:9443/ibm/api/social-login/redirect/liberty-aad-oidc-javaeecafe` > Click **Save**.
    > [!NOTE]
@@ -35,7 +35,7 @@ You've already set up an Azure Active Directory in the [previous guide](howto-de
 
 ## Prepare your application
 
-The application `<path-to-repo>/2-simple` used in the [previous guide](howto-deploy-java-openliberty-app.md) hasn't enabled authentication and authorization for security. To make it being protected by Azure AD, a number of files need to be updated or created:
+The application `<path-to-repo>/2-simple` used in the [previous guide](howto-deploy-java-liberty-app.md#prepare-the-liberty-application) hasn't enabled authentication and authorization for security. To make it being protected by Azure AD, a number of files need to be updated or created:
 
 | File Name             | Source Path                     | Destination Path              | Operation  | Description           |
 |-----------------------|---------------------------------|-------------------------------|------------|-----------------------|  
@@ -116,8 +116,8 @@ After the application image is built, run with your local Docker to verify wheth
 
 When you're satisfied with the state of the application, push it to the built-in container image registry by following the instructions below:
 
-1. Log in to the OpenShift web console from your browser using the credentials of the administrator.
-2. [Log in to the OpenShift CLI with the token for the administrator](howto-deploy-java-openliberty-app.md#log-in-to-the-openshift-cli-with-the-token).
+1. Log in to the OpenShift web console from your browser using the credentials of the Azure AD user.
+2. [Log in to the OpenShift CLI with the token for the Azure AD user](howto-deploy-java-liberty-app.md#log-in-to-the-openshift-cli-with-the-token).
 3. Run the following commands to push the application image to the registry.
 
    ```bash
@@ -148,8 +148,8 @@ For reference, these changes have already been applied in `<path-to-repo>/3-inte
 
 Now you can deploy the sample Liberty application to the ARO 4 cluster with the following steps.
 
-1. Log in to the OpenShift web console from your browser using the credentials of the administrator.
-2. [Log in to the OpenShift CLI with the token for the administrator](howto-deploy-java-openliberty-app.md#log-in-to-the-openshift-cli-with-the-token).
+1. Log in to the OpenShift web console from your browser using the credentials of the Azure AD user.
+2. [Log in to the OpenShift CLI with the token for the Azure AD user](howto-deploy-java-liberty-app.md#log-in-to-the-openshift-cli-with-the-token).
 3. Run the following commands to deploy the application.
 
    ```bash
