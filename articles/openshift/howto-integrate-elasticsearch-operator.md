@@ -20,11 +20,11 @@ In this guide, you will integrate your Liberty application with Elasticsearch st
 
 ## Before you begin
 
-In previous guide, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
+In a previous guide, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
 
 ### Deploy cluster logging inside OpenShift cluster
 
-To enable cluster logging inside OpenShift cluster, you can install EFK (Elasticsearch, Fluentd, and Kibana) stack on the ARO 4 cluster, which aggregates log data from all containers running on the cluster.
+To enable cluster logging inside OpenShift cluster, you will install an EFK (Elasticsearch, Fluentd, and Kibana) stack on the ARO 4 cluster, which aggregates log data from all containers running on the cluster.
 > [!NOTE]
 > Elasticsearch is a memory-intensive application. Refer to section [Set up Azure Red Hat OpenShift cluster](howto-deploy-java-openliberty-app.md#set-up-azure-red-hat-openshift-cluster) from the previous guide to learn how to specify appropriate virtual machine size for the worker nodes when creating the cluster.
 
@@ -37,7 +37,7 @@ Follow the instructions in these tutorials and then return here to continue.
    > [!NOTE]
    > To specify the name of an existing **StorageClass** for Elasticsearch storage in step **Create a Cluster Logging instance**, open **ARO web console** > **Storage** > **Storage Classes** and find the supported storage class name.
 
-After the newly created Cluster Logging instance is up and running, configure Fluentd to merge the JSON log message bodies emitted by sample application.
+Now configure Fluentd to merge the JSON log message bodies emitted by sample application.
 
 1. Switch to project `openshift-logging`:
 
@@ -45,11 +45,23 @@ After the newly created Cluster Logging instance is up and running, configure Fl
    oc project openshift-logging
    ```
 
-2. Change the cluster logging instance’s **managementState** field from **Managed** to **Unmanaged**:
+2. Change the cluster logging instance’s **managementState** field from **Managed** to **Unmanaged** using `oc edit` command:
 
    ```bash
    oc edit ClusterLogging instance
+
+   apiVersion: "logging.openshift.io/v1"
+   kind: "ClusterLogging"
+   metadata:
+     name: "instance"
+
+   ....
+
+   spec:
+     managementState: "Unmanaged"
    ```
+
+   The `oc edit` command is equivalent to `kubectl edit` command. For more information, please see [kubectl edit](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#edit) documentation.
 
 3. Set the environment variable **MERGE_JSON_LOG** to **true**:
 
@@ -61,13 +73,13 @@ After the newly created Cluster Logging instance is up and running, configure Fl
 
 The application `<path-to-repo>/2-simple` used in the [previous guide](howto-deploy-java-openliberty-app.md) is ready to write logs to `messages.log` file, using Java Logging API `java.util.logging`. With the **Open Liberty Operator**, which sets JSON as console log format and includes message as one of log sources, the application logs will be parsed by Fluentd and posted to Elasticsearch cluster.
 
-To distribute your application logs to EFK stack, a number of Kubernetes resource YAML files need to be updated or created.
+To distribute your application logs to the EFK stack, a number of Kubernetes resource YAML files need to be updated or created.
 
 | File Name             | Source Path                     | Destination Path              | Operation  | Description           |
 |-----------------------|---------------------------------|-------------------------------|------------|-----------------------|  
 | `openlibertyapplication.yaml` | [`<path-to-repo>/2-simple/openlibertyapplication.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/2-simple/openlibertyapplication.yaml) | [`<path-to-repo>/3-integration/elk-logging/cluster-logging/openlibertyapplication.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/elk-logging/cluster-logging/openlibertyapplication.yaml) | Updated | Changed name to `javaee-cafe-elk-cluster-logging`. |
 
-For reference, you can find these deployment files from `<path-to-repo>/3-integration/elk-logging/cluster-logging` of your local clone.
+For reference, you can find these deployment files at `<path-to-repo>/3-integration/elk-logging/cluster-logging` in your local clone.
 
 Now you can deploy the sample Liberty application to the ARO 4 cluster with the following steps.
 
@@ -91,15 +103,21 @@ Now you can deploy the sample Liberty application to the ARO 4 cluster with the 
    # Check if deployment created by Operator is ready
    oc get deployment javaee-cafe-elk-cluster-logging
 
-   # Get host of the route
-   HOST=$(oc get route javaee-cafe-elk-cluster-logging --template='{{ .spec.host }}')
-   echo "Route Host: $HOST"
+   NAME                              READY   UP-TO-DATE   AVAILABLE   AGE
+   javaee-cafe-elk-cluster-logging   1/1     1            0           102s
    ```
 
-Once the Liberty Application is up and running:
+4. Check to see `1/1` under the `READY` column before you continue. If not, investigate and resolve the problem before continuing.
+5. Discover the host of route to the application with the `oc get route` command, as shown here.
 
-1. Open the output of **Route Host** in your browser to visit the application home page.
-2. To generate application logs, **Create a new coffee** and **Delete an existing coffee** in the application home page.
+   ```bash
+   # Get host of the route
+   HOST=$(oc get route javaee-cafe-elk-cluster-logging --template='{{ .spec.host }}')
+   echo "Route Host: $HOST"   
+   ```
+
+6. Open the output of **Route Host** in your browser to visit the application home page.
+7. To generate application logs, **Create a new coffee** and **Delete an existing coffee** in the application home page.
 
 ## Visualize your application logs in Kibana
 
@@ -107,12 +125,12 @@ As long as the application logs are shipped to the Elasticsearch cluster, they c
 
 1. Log in to the OpenShift web console from your browser using the `kubeadmin` credentials. Click **Monitoring** > **Logging**.
 2. In the new opened window, click **Log in with OpenShift**. Log in with `kubeadmin` if required.
-3. In **Authorize Access** page, click **Allow selected permissions**. Wait until the Kibana web console is displayed.
+3. In the **Authorize Access** page, click **Allow selected permissions**. Wait until the Kibana web console is displayed.
 4. Open **Management** > **Index Patterns** > Select **project.\*** > Click **Refresh field list** icon at top-right of the page.
 
    ![refresh field list.png](./media/howto-integrate-elasticsearch-operator/refresh-field-list.png)
 5. Click **Discover**. Select index pattern **project.\*** from the dropdown list.
-6. Add **kubernetes.namespace_name**, **kubernetes.pod_name**, **loglevel**, and **message** from **Available Fields** into **Selected Fields**. Discover application logs from the work area of the page.
+6. Add **kubernetes.namespace_name**, **kubernetes.pod_name**, **loglevel**, and **message** from **Available Fields** into **Selected Fields**. You should now be able to view the logs from the work area of the page.
 
    ![discover application logs](./media/howto-integrate-elasticsearch-operator/discover-application-logs-cluster-logging.png)
 
