@@ -20,7 +20,7 @@ In this guide, you will integrate your Liberty application with Managed Elastics
 
 ## Before you begin
 
-In previous guide, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
+In a previous guide, a Java application, which is running inside Open Liberty/WebSphere Liberty runtime, is deployed to an ARO 4 cluster. If you have not done these steps, start with [Deploy a Java application with Open Liberty/WebSphere Liberty on an Azure Red Hat OpenShift 4 cluster](howto-deploy-java-openliberty-app.md) and return here to continue.
 
 ### Create a Managed Elasticsearch on Microsoft Azure
 
@@ -41,9 +41,9 @@ Follow the instructions below to create a deployment for the hosted Elasticsearc
 
 ## Deploy application with Filebeat to retrieve and ship application logs
 
-The application `<path-to-repo>/2-simple` used in the [previous guide](howto-deploy-java-openliberty-app.md) is ready to write logs to `messages.log` file, using Java Logging API `java.util.logging`. With logging in `JSON` format is configured, Filebeat can run as a side-container to collect and ship logs from `messages.log` file to the hosted Elasticsearch Service on Microsoft Azure.
+The application `<path-to-repo>/2-simple` used in the [previous guide](howto-deploy-java-openliberty-app.md) is ready to write logs to `messages.log` file, using Java Logging API `java.util.logging`. With logging in `JSON` format configured, Filebeat can run as a side-container to collect and ship logs from `messages.log` file to the hosted Elasticsearch Service on Microsoft Azure.
 
-To configure Filebeat as a side container to retrieve and ship application logs, a number of Kubernetes resource YAML files need to be updated or created.
+To configure Filebeat as a side container to retrieve and ship the logs, a number of Kubernetes resource YAML files need to be updated or created.
 
 | File Name             | Source Path                     | Destination Path              | Operation  | Description           |
 |-----------------------|---------------------------------|-------------------------------|------------|-----------------------|  
@@ -52,7 +52,7 @@ To configure Filebeat as a side container to retrieve and ship application logs,
 | `elastic-cloud-secret.yaml` | | [`<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/elastic-cloud-secret.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/elk-logging/hosted-elasticsearch/elastic-cloud-secret.yaml) | New | A Kubernetes **Secret** resource with hosted Elasticsearch Service connection credentials, including `elastic.cloud.id`, and `elastic.cloud.auth`. |
 | `openlibertyapplication.yaml` | [`<path-to-repo>/2-simple/openlibertyapplication.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/2-simple/openlibertyapplication.yaml) | [`<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch/openlibertyapplication.yaml`](https://github.com/Azure-Samples/open-liberty-on-aro/blob/master/3-integration/elk-logging/hosted-elasticsearch/openlibertyapplication.yaml) | Updated | Configure Filebeat as sidecar container. |
 
-For reference, you can find these deployment files from `<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch` of your local clone.
+For reference, you can find these deployment files at `<path-to-repo>/3-integration/elk-logging/hosted-elasticsearch` in your local clone.
 
 Now you can deploy the sample Liberty application to the ARO 4 cluster with the following steps.
 
@@ -93,15 +93,23 @@ Now you can deploy the sample Liberty application to the ARO 4 cluster with the 
    # Check if deployment created by Operator is ready
    oc get deployment javaee-cafe-elk-hosted-elasticsearch
 
+   NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE
+   javaee-cafe-elk-hosted-elasticsearch   1/1     1            0           102s
+   ```
+
+4. Check to see `1/1` under the `READY` column before you continue. If not, investigate and resolve the problem before continuing.
+5. Discover the host of route to the application with the `oc get route` command, as shown here.
+
+   ```bash
    # Get host of the route
    HOST=$(oc get route javaee-cafe-elk-hosted-elasticsearch --template='{{ .spec.host }}')
    echo "Route Host: $HOST"
+
+   Route Host: javaee-cafe-elk-hosted-elasticsearch-open-liberty-demo.apps.aqlm62xm.rnfghf.aroapp.io
    ```
 
-Once the Liberty Application is up and running:
-
-1. Open the output of **Route Host** in your browser to visit the application home page.
-2. To generate application logs, **Create a new coffee** and **Delete an existing coffee** in the application home page.
+6. Open the output of **Route Host** in your browser to visit the application home page.
+7. To generate application logs, **Create a new coffee** and **Delete an existing coffee** in the application home page.
 
 ## Visualize your application logs in Kibana
 
@@ -115,7 +123,7 @@ As long as the application logs are shipped to the Elasticsearch cluster, they c
 4. Set **filebeat-\*** as index pattern. Click **Next step**.
 
    ![configure settings of index pattern](./media/howto-integrate-elasticsearch-managed/create-index-pattern-settings.png)
-5. Select **@timestamp** as **Time Filter field name** > Click **Create index pattern**.
+5. Select **ibm_datetime** as **Time Filter field name** > Click **Create index pattern**.
 6. From the top-left of the Kibana home page, click menu icon to expand the top-level menu items. Click **Discover**. Check index pattern **filebeat-\*** is selected.
 7. Add **host&#46;name**, **loglevel**, and **message** from **Available fields** into **Selected fields**. Discover application logs from the work area of the page.
 
