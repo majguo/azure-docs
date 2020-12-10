@@ -61,7 +61,7 @@ Now configure Fluentd to merge the JSON log message bodies emitted by sample app
      managementState: "Unmanaged"
    ```
 
-   The `oc edit` command is equivalent to `kubectl edit` command. For more information, please see [kubectl edit](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#edit) documentation.
+   The `oc edit` command is almost equivalent to `kubectl edit` command. For more information, please see [oc edit](https://docs.openshift.com/container-platform/4.6/cli_reference/openshift_cli/developer-cli-commands.html#edit) and [kubectl edit](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands/#edit) documentations.
 
 3. Set the environment variable **MERGE_JSON_LOG** to **true**:
 
