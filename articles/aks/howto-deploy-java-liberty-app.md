@@ -65,17 +65,25 @@ You should see `Login Succeeded` at the end of command output if you have logged
 
 ## Create AKS cluster
 
-Use the [az aks create](/cli/azure/aks?view=azure-cli-latest&preserve-view=true#az_aks_create) command to create an AKS cluster. The following example creates a cluster named *myAKSCluster* with one node, and attaches the ACR created before. This will take several minutes to complete.
+Use the [az aks create](/cli/azure/aks?view=azure-cli-latest&preserve-view=true#az_aks_create) command to create an AKS cluster. The following example creates a cluster named *myAKSCluster* with one node, and accesses the ACR created before. This will take several minutes to complete.
 
 1. Follow [Quickstart: Check access for a user to Azure resources](../role-based-access-control/check-access.md) to check your access level for the subscription.
 1. If your role is **Owner**:
    ```azurecli-interactive
    az aks create --resource-group java-liberty-project --name myAKSCluster --node-count 1 --generate-ssh-keys --attach-acr youruniqueacrname
    ```
-1. If your role is **Contributor**, ask the owner of the subscription to give you an Azure service principal with **Contributor** role assignment of the subscription, or create a new one by following [How to: Use the portal to create an Azure AD application and service principal that can access resources](../active-directory/develop/howto-create-service-principal-portal.md). Use the service principal to create the AKS cluster:
-   ```azurecli-interactive
-   az aks create --resource-group java-liberty-project --name myAKSCluster --service-principal <client-id> --client-secret <client-secret> --node-count 1 --generate-ssh-keys --attach-acr youruniqueacrname
-   ```
+1. If your role is **Contributor**:
+   1. Ask the owner of the subscription to give you an Azure service principal with **Contributor** role assignment of the subscription, or create a new one by following [How to: Use the portal to create an Azure AD application and service principal that can access resources](../active-directory/develop/howto-create-service-principal-portal.md).
+   1. Ask the owner of the subscription to grant `pull` permission of the ACR to the service principal:
+      
+      ```azurecli-interactive
+      az role assignment create --assignee-object-id <service-principal-object-id> --scope $(az acr show --name youruniqueacrname --query id --output tsv) --role acrpull
+      ```
+
+   1. Use the service principal to create the AKS cluster:
+      ```azurecli-interactive
+      az aks create --resource-group java-liberty-project --name myAKSCluster --service-principal <client-id> --client-secret <client-secret> --node-count 1 --generate-ssh-keys
+      ```
 
 After a few minutes, the command completes and returns JSON-formatted information about the cluster, including the following:
 
